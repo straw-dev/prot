@@ -1,11 +1,13 @@
-import sys
-print(sys.executable)
 import cv2
 import mediapipe as mp
 
+# 아래처럼 solutions를 직접 임포트해 보세요
+from mediapipe.python.solutions import pose as mp_pose
+from mediapipe.python.solutions import drawing_utils as mp_drawing
+
 # MediaPipe Pose 및 그리기 도구 초기화
-mp_pose = mp.solutions.pose
-mp_drawing = mp.solutions.drawing_utils
+'''mp_pose = mp.solutions.pose
+ mp_drawing = mp.solutions.drawing_utils'''
 pose = mp_pose.Pose(
     static_image_mode=False,
     model_complexity=1,
