@@ -6,7 +6,7 @@ mp_hands = mp.solutions.hands
 mp_draw = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
-cap.set(3, 1200)
+cap.set(3, 1280)
 cap.set(4, 720)
 
 def main():
@@ -26,3 +26,6 @@ def main():
             break
     cap.release()
     cv2.destroyAllWindows()
+    
+if __name__ == "__main__":
+    main()
