@@ -1,4 +1,5 @@
 import cv2
+<<<<<<< Updated upstream
 import mediapipe as mp
 
 # 아래처럼 solutions를 직접 임포트해 보세요
@@ -59,3 +60,6 @@ while cap.isOpened():
 cap.release()
 cv2.destroyAllWindows()
 pose.close()
+=======
+print (cv2._version)
+>>>>>>> Stashed changes

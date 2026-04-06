@@ -36,3 +36,27 @@ while cap.isOpened():
 
 cap.release()
 cv2.destroyAllWindows()
+import sys
+import os
+
+import sys
+import os
+
+# 1. 아까 'pip show'에서 확인한 Location 경로를 아래에 정확히 넣어줘
+# (예: r"C:\Users\i\AppData\Local\Programs\Python\Python311\Lib\site-packages")
+real_path = r"여기에_아까_복사한_경로를_넣어줘"
+
+if real_path not in sys.path:
+    sys.path.insert(0, real_path)
+
+import mediapipe as mp
+
+# 이제 확인해보자
+try:
+    print("✅ 버전:", mp.__version__)
+    print("✅ 솔루션 체크:", hasattr(mp, 'solutions'))
+    mp_hands = mp.solutions.hands
+    print("🔥 드디어 성공! 이제 친구들이랑 작업 계속해!")
+except Exception as e:
+    print(f"❌ 이래도 안된다고? 에러 내용: {e}")
+    
