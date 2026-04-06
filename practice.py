@@ -1,65 +1,45 @@
 import cv2
-<<<<<<< Updated upstream
 import mediapipe as mp
 
-# 아래처럼 solutions를 직접 임포트해 보세요
-from mediapipe.python.solutions import pose as mp_pose
-from mediapipe.python.solutions import drawing_utils as mp_drawing
+# 1. 기초 설정
+mp_pose = mp.solutions.pose
+mp_drawing = mp.solutions.drawing_utils
+# model_complexity: 0(빠름), 1(보통), 2(정확함 - GPU 권장)
+pose = mp_pose.Pose(model_complexity=1, min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
-# MediaPipe Pose 및 그리기 도구 초기화
-'''mp_pose = mp.solutions.pose
- mp_drawing = mp.solutions.drawing_utils'''
-pose = mp_pose.Pose(
-    static_image_mode=False,
-    model_complexity=1,
-    enable_segmentation=False,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
-)
-
-# 노트북 내장 카메라 연결 (0번은 기본 내장 카메라)
 cap = cv2.VideoCapture(0)
 
-print("프로그램을 종료하려면 'q'를 누르세요.")
-
 while cap.isOpened():
-    success, image = cap.read()
+    success, frame = cap.read()
     if not success:
-        print("카메라를 찾을 수 없습니다.")
         break
 
-    # 성능을 위해 이미지 쓰기 불가능 설정 및 BGR에서 RGB로 변환
-    image.flags.writeable = False
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    
-    # 자세 감지 수행
-    results = pose.process(image)
+    # 2. 이미지 전처리
+    frame = cv2.flip(frame, 1) # 거울 모드
+    img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = pose.process(img_rgb)
 
-    # 다시 화면에 그리기 위해 RGB에서 BGR로 변환 및 쓰기 가능 설정
-    image.flags.writeable = True
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-    # 랜드마크가 감지된 경우 화면에 그리기
+    # 3. 랜드마크 출력 및 좌표 추출
     if results.pose_landmarks:
+        # 스켈레톤(뼈대) 그리기
         mp_drawing.draw_landmarks(
-            image,
-            results.pose_landmarks,
+            frame, 
+            results.pose_landmarks, 
             mp_pose.POSE_CONNECTIONS,
-            landmark_drawing_spec=mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
-            connection_drawing_spec=mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2)
+            mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2), # 점 설정
+            mp_drawing.DrawingSpec(color=(255, 255, 255), thickness=2) # 선 설정
         )
 
-    # 결과 영상 출력
-    cv2.imshow('MediaPipe Real-time Pose Detection', image)
+        # 예시: 오른쪽 어깨 좌표만 따로 가져오고 싶을 때
+        # landmarks = results.pose_landmarks.landmark
+        # r_shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x, 
+        #               landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
 
-    # 'q' 키를 누르면 루프 종료
-    if cv2.waitKey(5) & 0xFF == ord('q'):
+    # 4. 결과창 출력
+    cv2.imshow('Full Body Tracking', frame)
+
+    if cv2.waitKey(1) & 0xFF == 27: # ESC 누르면 종료
         break
 
-# 자원 해제
 cap.release()
 cv2.destroyAllWindows()
-pose.close()
-=======
-print (cv2._version)
->>>>>>> Stashed changes
