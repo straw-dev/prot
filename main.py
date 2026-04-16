@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt #to show resultant images
 import mediapipe as mp
 
 # Initializing mediapipe pose class.
-mp_pose = mp.solutions.pose
+mp_pose = mp.solutions.pose #실제로 포즈 추정 모델 가져오는것. 얼굴/손 등 가져옴.
 # Setting up the Pose model for images.
 pose_img = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5, model_complexity=1)
 # Setting up the Pose model for videos.
@@ -11,7 +11,7 @@ pose_video = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5,
 min_tracking_confidence=0.5, model_complexity=1)
 
 # Initializing mediapipe drawing class to draw landmarks on specified image.
-mp_drawing = mp.solutions.drawing_utils
+mp_drawing = mp.solutions.drawing_utils #실제로 포즈를 시각화할 때 유틸리티 사용
 
 def estimPose_img(input_file, pose=pose_img, landmarks_c=(234,63,247), connection_c=(117,249,77), thickness=20, circle_r=10, display=True):
     

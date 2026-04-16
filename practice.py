@@ -7,7 +7,13 @@ mp_drawing = mp.solutions.drawing_utils
 # model_complexity: 0(빠름), 1(보통), 2(정확함 - GPU 권장)
 pose = mp_pose.Pose(model_complexity=1, min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
-cap = cv2.VideoCapture(0)
+vid_path = input("path: ")
+if vid_path=='0':
+    vid_path = int(vid_path)
+else:
+    vid_path = vid_path.strip().replace('"','')
+
+cap = cv2.VideoCapture(vid_path)
 
 while cap.isOpened():
     success, frame = cap.read()
