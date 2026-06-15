@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # ==========================================
-# 0. [추가] 순수 수학 공식 기반 1차원 칼만 필터 클래스 정의
+# 0. 순수 수학 공식 기반 1차원 칼만 필터 클래스 정의
 # ==========================================
 class SimpleKalmanFilter:
     def __init__(self, process_noise=0.01, measurement_noise=0.5):
@@ -31,6 +31,50 @@ class SimpleKalmanFilter:
         self.P = (1 - kalman_gain) * P_predicted
 
         return self.X_estimated
+
+# ==========================================
+# 0-1. [추가] IQR 기반 이상치 검출 및 제거 함수 정의
+# ==========================================
+IQR_MULTIPLIER = 1.5  # 이상치 판단 기준 (일반적으로 1.5 배수 사용)
+
+def remove_outlier_by_iqr(current_angle, angle_history, diff_history):
+    """
+    최근 프레임 간 변화량의 IQR을 계산하여, 통계적 범위를 넘어서는 대형 노이즈를 직전 값으로 보정
+    """
+    # 이전에 기록된 최종 각도가 없으면(첫 프레임) 그대로 반환
+    if not angle_history:
+        return current_angle
+        
+    # 직전 최종 각도와의 변화량(절댓값) 계산
+    current_diff = abs(current_angle - angle_history[-1])
+    
+    # 데이터가 아직 부족할 때는(초반 5프레임 미만) 기록 수집을 위해 그냥 통과
+    if len(diff_history) < 5:
+        diff_history.append(current_diff)
+        return current_angle
+        
+    # 최근 5개 변화량에 대한 Q1, Q3 및 IQR 연산
+    q1 = np.percentile(diff_history, 25)
+    q3 = np.percentile(diff_history, 75)
+    iqr = q3 - q1
+    
+    # 이상치 판단의 임계 상한선 설정
+    upper_bound = q3 + (IQR_MULTIPLIER * iqr)
+    
+    # 태권도 동작의 고속 특성을 감안해 최소 변화 한계선(15도) 보장 (IQR이 극도로 작아 오류나는 것 방지)
+    if upper_bound < 15.0:
+        upper_bound = 15.0
+        
+    # 만약 현재 변화량이 통계적 상한선을 초과했다면 '뒷사람 간섭 등에 의한 이상치'로 판단
+    if current_diff > upper_bound:
+        # 현재의 에러 데이터를 버리고, 가장 믿을 수 있는 '직전 프레임의 각도'를 임시 유지
+        return angle_history[-1]
+    else:
+        # 정상 움직임일 경우 변화량 기록을 업데이트하고 현재 각도를 통과시킴
+        diff_history.append(current_diff)
+        if len(diff_history) > 5:
+            diff_history.pop(0)  # 최근 5개만 유지하는 슬라이딩 윈도우 구조
+        return current_angle
 
 # ==========================================
 
@@ -85,8 +129,11 @@ right_knee_angles = []
 frames = []
 frame_count = 0
 
-# ⭐ [추가] 양쪽 무릎 각도 필터링을 위한 독립적인 칼만 필터 인스턴스 생성
-# R(측정노이즈)을 5.0 정도로 높게 주어 값이 뚝 떨어지는 노이즈를 방어합니다.
+# ⭐ [추가] IQR 필터에 사용될 다리별 최근 변화량 저장소 리스트
+left_diffs = []
+right_diffs = []
+
+# ⭐ [최적화] 칼만 필터 인스턴스 생성 및 피드백 주신 검증된 R 값(0.01) 적용
 kf_left = SimpleKalmanFilter(process_noise=0.01, measurement_noise=0.01)
 kf_right = SimpleKalmanFilter(process_noise=0.01, measurement_noise=0.01)
 
@@ -130,13 +177,17 @@ while cap.isOpened():
         right_knee = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x * w_max, landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y * h_max]
         right_ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x * w_max, landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y * h_max]
         
-        # 원본 각도 계산
+        # [1단계] 미필터링 순수 원본 각도 계산
         raw_l_angle = calculate_angle(left_hip, left_knee, left_ankle)
         raw_r_angle = calculate_angle(right_hip, right_knee, right_ankle)
         
-        # ⭐ [수정] 원본 각도를 칼만 필터에 통과시켜 노이즈가 제거된 각도 획득
-        l_knee_angle = kf_left.filter(raw_l_angle)
-        r_knee_angle = kf_right.filter(raw_r_angle)
+        # [2단계] ⭐ [IQR 필터 통과] 툭 떨어지거나 튀는 초대형 이상치 아웃
+        iqr_l_angle = remove_outlier_by_iqr(raw_l_angle, left_knee_angles, left_diffs)
+        iqr_r_angle = remove_outlier_by_iqr(raw_r_angle, right_knee_angles, right_diffs)
+        
+        # [3단계] ⭐ [칼만 필터 통과] 통과된 데이터의 미세 떨림 보정 및 고속 트래킹 감지
+        l_knee_angle = kf_left.filter(iqr_l_angle)
+        r_knee_angle = kf_right.filter(iqr_r_angle)
         
         left_knee_angles.append(l_knee_angle)
         right_knee_angles.append(r_knee_angle)
@@ -148,7 +199,7 @@ while cap.isOpened():
         font_scale = max(0.5, TARGET_WIDTH / 1000.0)
         thickness = max(1, int(TARGET_WIDTH / 500))
 
-        # 화면에도 칼만필터로 보정된 부드러운 각도가 실시간 표기됩니다.
+        # 화면에도 최종 하이브리드 필터(IQR + 칼만)를 거친 결과가 출력됩니다.
         cv2.putText(annotated_image, f"Left Knee: {int(l_knee_angle)} deg", 
                     (int(w_max*0.05), int(h_max*0.08)), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 0, 0), thickness, cv2.LINE_AA)
         cv2.putText(annotated_image, f"Right Knee: {int(r_knee_angle)} deg", 
@@ -180,8 +231,8 @@ pose.close()
 # 6. Matplotlib 그래프 출력 부분
 if frames:
     plt.figure(figsize=(12, 6))
-    plt.plot(frames, left_knee_angles, label='Left Knee Angle (Filtered)', color='blue')
-    plt.plot(frames, right_knee_angles, label='Right Knee Angle (Filtered)', color='red', linestyle='--')
+    plt.plot(frames, left_knee_angles, label='Left Knee Angle (IQR + Kalman)', color='blue')
+    plt.plot(frames, right_knee_angles, label='Right Knee Angle (IQR + Kalman)', color='red', linestyle='--')
 
     max_l_angle = max(left_knee_angles)
     max_r_angle = max(right_knee_angles)
@@ -200,7 +251,7 @@ if frames:
                  xytext=(peak_frame + (frame_count * 0.02), peak_angle - 15),
                  arrowprops=dict(facecolor='black', shrink=0.05, width=1, headwidth=6))
 
-    plt.title('TaeKwonDo Side Kick Knee Angle Time-Series Analysis (with Kalman Filter)')
+    plt.title('TaeKwonDo Knee Angle Analysis (IQR Outlier Filtering & Kalman Filter)')
     plt.xlabel('Frame Number')
     plt.ylabel('Knee Angle (degrees)')
     plt.ylim(0, 190)
@@ -208,4 +259,4 @@ if frames:
     plt.legend()
     plt.tight_layout()
     plt.show()
-    print("\n[알림] 영상 분석이 끝나고 각도 변화 그래프가 성공적으로 출력되었습니다.")
+    print("\n[알림] 영상 분석이 끝나고 IQR과 칼만 필터가 모두 결합된 각도 변화 그래프가 성공적으로 출력되었습니다.")
